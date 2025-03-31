@@ -21,7 +21,7 @@ To get started with **QuantumCacheDB**, ensure you have Dart or Flutter installe
 
    ```yaml
    dependencies:
-     quantumcachedb: ^1.0.0
+     quantum_cache_db: ^1.0.0
    ```
 
 2. Run `flutter pub get` (or `dart pub get` for Dart projects) to install the dependencies.
@@ -31,7 +31,7 @@ To get started with **QuantumCacheDB**, ensure you have Dart or Flutter installe
 Here is a quick example of how to use **QuantumCacheDB** in your Dart or Flutter application:
 
 ```dart
-import 'package:quantumcachedb/quantumcachedb.dart';
+import 'package:quantum_cache_db/quantum_cache_db.dart.dart';
 
 // Initialize database
 var db = QuantumCacheDB();
@@ -46,7 +46,7 @@ print(user); // Output: {name: John Doe, email: john.doe@example.com}
 
 ## Additional information
 
-For more information on how to use **QuantumCacheDB**, check out the [documentation](https://quantumcachedb.com/docs).
+For more information on how to use **QuantumCacheDB**, check out the [documentation](https://github.com/champ96k/quantum_cache_db).
 
 If you encounter any issues, feel free to file them in the [issues section](https://github.com/QuantumCacheDB/quantum-cache-db/issues). We welcome contributions! If you'd like to contribute, check out our [contributing guidelines](https://github.com/QuantumCacheDB/quantum-cache-db/blob/main/CONTRIBUTING.md).
 
