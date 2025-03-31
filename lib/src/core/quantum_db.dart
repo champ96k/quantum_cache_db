@@ -10,8 +10,8 @@ class QuantumQueryEngine {
   void indexField(
       String collection, String field, dynamic value, String docId) {
     if (value == null || value is! Comparable) {
-      print(
-          "⚠️ Skipping indexing for '$field' as it is null or not comparable.");
+      // print(
+      //     "⚠️ Skipping indexing for '$field' as it is null or not comparable.");
       return; // Skip indexing if value is null or not comparable
     }
     _index.insert(collection, field, value, docId);

@@ -1,25 +1,53 @@
-// # Write-Ahead Logging
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 
 class WriteAheadLog {
   final String logPath;
   late IOSink _logSink;
+  bool _isClosed = false;
+  late StreamController<String> _writeQueue;
 
   WriteAheadLog(this.logPath) {
-    final logFile = File(logPath);
-    _logSink = logFile.openWrite(mode: FileMode.append);
+    _initializeLogSink();
+    _writeQueue = StreamController<String>();
+    _writeQueue.stream.listen((logEntry) async {
+      // Ensure only one write operation is performed at a time
+      if (!_isClosed) {
+        try {
+          _logSink.writeln(logEntry);
+          await _logSink.flush();
+        } catch (e) {
+          // print('Error during write: $e');
+        }
+      }
+    });
   }
 
-  void logWrite(String operation, String key, dynamic value) {
+  void _initializeLogSink() {
+    final logFile = File(logPath);
+
+    if (logFile.existsSync()) {
+      _logSink = logFile.openWrite(mode: FileMode.append);
+    } else {
+      _logSink = logFile.openWrite(mode: FileMode.writeOnly);
+    }
+  }
+
+  Future<void> logWrite(String operation, String key, dynamic value) async {
+    if (_isClosed) {
+      throw StateError("Cannot write to a closed Write-Ahead Log.");
+    }
+
     final logEntry = jsonEncode({
       'op': operation,
       'key': key,
       'value': value,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
-    _logSink.writeln(logEntry);
-    _logSink.flush();
+
+    // Add the log entry to the queue for asynchronous processing
+    _writeQueue.add(logEntry);
   }
 
   Future<List<Map<String, dynamic>>> readLogs() async {
@@ -37,7 +65,12 @@ class WriteAheadLog {
     await logFile.writeAsString('');
   }
 
-  void close() {
-    _logSink.close();
+  Future<void> close() async {
+    if (_isClosed) return;
+    _isClosed = true;
+
+    await _writeQueue.close();
+    await _logSink.flush();
+    await _logSink.close();
   }
 }

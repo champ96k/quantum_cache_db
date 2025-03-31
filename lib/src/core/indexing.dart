@@ -7,8 +7,8 @@ class Index {
   /// Inserts a new key-documentId mapping into the index.
   void insert(String collection, String field, dynamic value, String docId) {
     if (value == null || value is! Comparable) {
-      print(
-          "⚠️ Skipping indexing for '$field' due to null/non-comparable value.");
+      // print(
+      //     "⚠️ Skipping indexing for '$field' due to null/non-comparable value.");
       return;
     }
 

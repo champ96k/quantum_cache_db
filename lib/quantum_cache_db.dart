@@ -18,49 +18,74 @@ class QuantumCacheDB {
   final QuantumQueryEngine _queryEngine = QuantumQueryEngine();
 
   QuantumCacheDB(this.dbPath, String encryptionKey) {
-    _wal = WriteAheadLog('$dbPath.wal');
-    _encryption = Encryption(encryptionKey);
+    try {
+      _wal = WriteAheadLog('$dbPath.wal');
+      _encryption = Encryption(encryptionKey);
+    } catch (e) {
+      print('Error initializing QuantumCacheDB: $e');
+      rethrow;
+    }
   }
 
   Future<void> init() async {
-    final file = File(dbPath);
-    if (await file.exists()) {
-      final content = await file.readAsString();
-      final decryptedData = _encryption.decrypt(content);
-      final data = jsonDecode(decryptedData);
+    try {
+      final file = File(dbPath);
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final decryptedData = _encryption.decrypt(content);
+        final data = jsonDecode(decryptedData);
 
-      for (var entry in data['keyValueStore'].entries) {
-        _cache.setKV(entry.key, entry.value);
-      }
-      for (var collection in data['collections'].entries) {
-        for (var doc in collection.value.entries) {
-          _cache.setDocument(collection.key, doc.key, doc.value);
+        for (var entry in data['keyValueStore'].entries) {
+          _cache.setKV(entry.key, entry.value);
+        }
+        for (var collection in data['collections'].entries) {
+          for (var doc in collection.value.entries) {
+            _cache.setDocument(collection.key, doc.key, doc.value);
+          }
         }
       }
+    } catch (e) {
+      print('Error during initialization: $e');
+      rethrow;
     }
   }
 
   Future<void> set(String key, dynamic value) async {
-    final encryptedValue = _encryption.encrypt(jsonEncode(value));
-    _wal.logWrite('set', key, encryptedValue);
-    _cache.setKV(key, encryptedValue);
-    _streamController.add("key:$key");
-    await _persist();
+    try {
+      final encryptedValue = _encryption.encrypt(jsonEncode(value));
+      await _wal.logWrite('set', key, encryptedValue);
+      _cache.setKV(key, encryptedValue);
+      _streamController.add("key:$key");
+      await _persist();
+    } catch (e) {
+      print('Error setting key $key: $e');
+      rethrow;
+    }
   }
 
   dynamic get(String key) {
-    final encryptedValue = _cache.getKV(key);
-    if (encryptedValue != null) {
-      return jsonDecode(_encryption.decrypt(encryptedValue));
+    try {
+      final encryptedValue = _cache.getKV(key);
+      if (encryptedValue != null) {
+        return jsonDecode(_encryption.decrypt(encryptedValue));
+      }
+      return null;
+    } catch (e) {
+      print('Error getting key $key: $e');
+      rethrow;
     }
-    return null;
   }
 
   Future<void> delete(String key) async {
-    _wal.logWrite('delete', key, null);
-    _cache.removeKV(key);
-    _streamController.add("key:$key");
-    await _persist();
+    try {
+      _wal.logWrite('delete', key, null);
+      _cache.removeKV(key);
+      _streamController.add("key:$key");
+      await _persist();
+    } catch (e) {
+      print('Error deleting key $key: $e');
+      rethrow;
+    }
   }
 
   Stream<dynamic> watchKey(String key) {
