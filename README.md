@@ -48,7 +48,7 @@ print(user); // Output: {name: John Doe, email: john.doe@example.com}
 
 For more information on how to use **QuantumCacheDB**, check out the [documentation](https://github.com/champ96k/quantum_cache_db).
 
-If you encounter any issues, feel free to file them in the [issues section](https://github.com/QuantumCacheDB/quantum-cache-db/issues). We welcome contributions! If you'd like to contribute, check out our [contributing guidelines](https://github.com/QuantumCacheDB/quantum-cache-db/blob/main/CONTRIBUTING.md).
+If you encounter any issues, feel free to file them in the [issues section](https://github.com/champ96k/quantum_cache_db/issues). We welcome contributions! If you'd like to contribute, check out our [contributing guidelines](https://github.com/champ96k/quantum_cache_db/blob/main/CONTRIBUTING.md).
 
 ### License
 
