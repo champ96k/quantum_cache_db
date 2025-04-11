@@ -5,7 +5,7 @@ import 'package:quantum_cache_db/quantum_cache_db.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:path/path.dart' as path;
 
-const int numberOfOperations = 100000;
+const int numberOfOperations = 10000;
 const bool showDebugOutput = false;
 
 class BenchmarkResult {
