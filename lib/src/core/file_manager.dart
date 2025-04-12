@@ -45,4 +45,15 @@ class FileManager {
 
   Future<int> get length async => _logicalSize;
   String get path => _path;
+
+  Future<Uint8List> readPage(int pageNumber) async {
+    const pageSize = 4096;
+    final start = pageNumber * pageSize;
+    if (start >= _logicalSize) return Uint8List(0);
+
+    final end = start + pageSize;
+    final length = (end > _logicalSize) ? _logicalSize - start : pageSize;
+    await _file!.setPosition(start);
+    return await _file!.read(length);
+  }
 }

@@ -99,11 +99,45 @@ class IsolatePool {
   }
 
   Future<Uint8List> encode(dynamic value) async {
-    return await _execute('encode', value);
+    if (_shouldEncodeInMainIsolate(value)) {
+      return BinaryCodec().encode(value);
+    } else {
+      return await _execute('encode', value);
+    }
   }
 
   Future<dynamic> decode(Uint8List data) async {
     return await _execute('decode', data);
+  }
+
+  bool _shouldEncodeInMainIsolate(dynamic value) {
+    // Encode in main isolate if small (e.g., < 1KB)
+    final size = _estimateSize(value);
+    return size < 1024;
+  }
+
+  int _estimateSize(dynamic value) {
+    if (value == null) return 0;
+    if (value is String) return value.length * 2; // UTF16 estimation
+    if (value is int) return 8; // 64-bit integer
+    if (value is double) return 8;
+    if (value is bool) return 1;
+
+    if (value is Map) {
+      return value.entries.fold(
+          0,
+          (sum, entry) =>
+              sum + _estimateSize(entry.key) + _estimateSize(entry.value));
+    }
+
+    if (value is List) {
+      return value.fold(0, (sum, item) => sum + _estimateSize(item));
+    }
+
+    if (value is Uint8List) return value.length;
+
+    // Fallback for unknown types
+    return 1024; // Assume large size to force isolate usage
   }
 
   Future<void> dispose() async {

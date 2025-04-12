@@ -9,13 +9,11 @@ class HashIndex {
   final Mutex _mutex = Mutex();
 
   Future<void> put(String key, RecordPointer pointer) async {
-    await _mutex.protect(() async {
-      _index[key] = pointer;
-    });
+    _index[key] = pointer;
   }
 
   Future<RecordPointer?> get(String key) async {
-    return await _mutex.protect(() async => _index[key]);
+    return _index[key];
   }
 
   Future<bool> containsKey(String key) async {

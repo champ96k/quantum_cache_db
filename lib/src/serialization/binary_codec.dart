@@ -2,6 +2,8 @@
 import 'dart:typed_data';
 import 'dart:convert';
 
+import 'package:quantum_cache_db/src/serialization/reader_state.dart';
+
 class BinaryCodec {
   // Type identifiers
   static const int _typeNull = 0;
@@ -20,11 +22,9 @@ class BinaryCodec {
 
   dynamic decode(Uint8List bytes) {
     if (bytes.isEmpty) return null;
-
-    final reader =
-        ByteData.view(bytes.buffer, bytes.offsetInBytes, bytes.length);
-    var offset = 0;
-    return _decodeValue(reader, offset);
+    final reader = ReaderState(
+        ByteData.view(bytes.buffer, bytes.offsetInBytes, bytes.length));
+    return _decodeValue(reader);
   }
 
   void _encodeValue(BytesBuilder builder, dynamic value) {
@@ -47,24 +47,24 @@ class BinaryCodec {
     }
   }
 
-  dynamic _decodeValue(ByteData reader, int offset) {
-    final type = reader.getUint8(offset++);
+  dynamic _decodeValue(ReaderState reader) {
+    final type = reader.data.getUint8(reader.offset++);
 
     switch (type) {
       case _typeNull:
         return null;
       case _typeMap:
-        return _decodeMap(reader, offset);
+        return _decodeMap(reader);
       case _typeList:
-        return _decodeList(reader, offset);
+        return _decodeList(reader);
       case _typeString:
-        return _decodeString(reader, offset);
+        return _decodeString(reader);
       case _typeInt:
-        return _decodeInt(reader, offset);
+        return _decodeInt(reader);
       case _typeDouble:
-        return _decodeDouble(reader, offset);
+        return _decodeDouble(reader);
       case _typeBool:
-        return _decodeBool(reader, offset);
+        return _decodeBool(reader);
       default:
         throw FormatException('Unknown type ID: $type');
     }
@@ -80,16 +80,12 @@ class BinaryCodec {
     });
   }
 
-  Map<String, dynamic> _decodeMap(ByteData reader, int offset) {
-    final length = _decodeInt(reader, offset);
-    offset += 4;
-
+  Map<String, dynamic> _decodeMap(ReaderState reader) {
+    final length = _decodeInt(reader);
     final map = <String, dynamic>{};
     for (var i = 0; i < length; i++) {
-      final key = _decodeString(reader, offset);
-      offset += 4 + utf8.encode(key).length;
-      final value = _decodeValue(reader, offset);
-      offset += _getValueSize(reader, offset);
+      final key = _decodeString(reader);
+      final value = _decodeValue(reader);
       map[key] = value;
     }
     return map;
@@ -104,17 +100,22 @@ class BinaryCodec {
     }
   }
 
-  List<dynamic> _decodeList(ByteData reader, int offset) {
-    final length = _decodeInt(reader, offset);
-    offset += 4;
+  List<dynamic> _decodeList(ReaderState reader) {
+    final length = _decodeInt(reader);
+    final list = List<dynamic>.filled(length, null);
 
-    final list = <dynamic>[];
     for (var i = 0; i < length; i++) {
-      final value = _decodeValue(reader, offset);
-      offset += _getValueSize(reader, offset);
-      list.add(value);
+      list[i] = _decodeValue(reader);
     }
     return list;
+  }
+
+  String _decodeString(ReaderState reader) {
+    final length = _decodeInt(reader);
+    final bytes = Uint8List.view(
+        reader.data.buffer, reader.data.offsetInBytes + reader.offset, length);
+    reader.offset += length;
+    return utf8.decode(bytes);
   }
 
   void _encodeString(BytesBuilder builder, String value) {
@@ -122,18 +123,6 @@ class BinaryCodec {
     final bytes = utf8.encode(value);
     _encodeInt(builder, bytes.length);
     builder.add(bytes);
-  }
-
-  String _decodeString(ByteData reader, int offset) {
-    final length = _decodeInt(reader, offset);
-    offset += 4;
-
-    final bytes = Uint8List.view(
-      reader.buffer,
-      reader.offsetInBytes + offset,
-      length,
-    );
-    return utf8.decode(bytes);
   }
 
   void _encodeInt(BytesBuilder builder, int value) {
@@ -144,8 +133,10 @@ class BinaryCodec {
     builder.addByte(value);
   }
 
-  int _decodeInt(ByteData reader, int offset) {
-    return reader.getInt32(offset, Endian.big);
+  int _decodeInt(ReaderState reader) {
+    final value = reader.data.getInt32(reader.offset, Endian.big);
+    reader.offset += 4;
+    return value;
   }
 
   void _encodeDouble(BytesBuilder builder, double value) {
@@ -154,8 +145,10 @@ class BinaryCodec {
     builder.add(bytes.buffer.asUint8List());
   }
 
-  double _decodeDouble(ByteData reader, int offset) {
-    return reader.getFloat64(offset, Endian.big);
+  double _decodeDouble(ReaderState reader) {
+    final value = reader.data.getFloat64(reader.offset, Endian.big);
+    reader.offset += 8;
+    return value;
   }
 
   void _encodeBool(BytesBuilder builder, bool value) {
@@ -163,64 +156,7 @@ class BinaryCodec {
     builder.addByte(value ? 1 : 0);
   }
 
-  bool _decodeBool(ByteData reader, int offset) {
-    return reader.getUint8(offset) == 1;
-  }
-
-  int _getValueSize(ByteData reader, int offset) {
-    final type = reader.getUint8(offset);
-
-    switch (type) {
-      case _typeNull:
-        return 1;
-      case _typeMap:
-        return _getMapSize(reader, offset + 1);
-      case _typeList:
-        return _getListSize(reader, offset + 1);
-      case _typeString:
-        return 5 + _decodeInt(reader, offset + 1);
-      case _typeInt:
-        return 5;
-      case _typeDouble:
-        return 9;
-      case _typeBool:
-        return 2;
-      default:
-        throw FormatException('Unknown type ID: $type');
-    }
-  }
-
-  int _getMapSize(ByteData reader, int offset) {
-    var size = 1; // type byte
-    final length = _decodeInt(reader, offset);
-    size += 4; // length
-
-    offset += 4;
-    for (var i = 0; i < length; i++) {
-      // Key size
-      final keyLength = _decodeInt(reader, offset);
-      size += 4 + keyLength;
-      offset += 4 + keyLength;
-
-      // Value size
-      final valueSize = _getValueSize(reader, offset);
-      size += valueSize;
-      offset += valueSize;
-    }
-    return size;
-  }
-
-  int _getListSize(ByteData reader, int offset) {
-    var size = 1; // type byte
-    final length = _decodeInt(reader, offset);
-    size += 4; // length
-
-    offset += 4;
-    for (var i = 0; i < length; i++) {
-      final itemSize = _getValueSize(reader, offset);
-      size += itemSize;
-      offset += itemSize;
-    }
-    return size;
+  bool _decodeBool(ReaderState reader) {
+    return reader.data.getUint8(reader.offset++) == 1;
   }
 }

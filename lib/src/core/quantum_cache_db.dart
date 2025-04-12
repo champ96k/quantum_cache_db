@@ -13,7 +13,7 @@ class QuantumCacheDB {
   final Mutex _writeMutex = Mutex();
 
   QuantumCacheDB(String path, {int isolateCount = 2})
-      : _memory = MemoryManager(),
+      : _memory = MemoryManager(FileManager(path)),
         _files = FileManager(path),
         _isolates = IsolatePool() {
     _isolates.initialize(isolateCount);
