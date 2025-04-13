@@ -1,10 +1,7 @@
 // # Low-level storage operations
 
 import 'package:mutex/mutex.dart';
-import 'package:quantum_cache_db/src/core/file_manager.dart';
-import 'package:quantum_cache_db/src/core/memory_manager.dart';
-import 'package:quantum_cache_db/src/core/record_pointer.dart';
-import 'package:quantum_cache_db/src/utils/isolate_pool.dart';
+import 'package:quantum_cache_db/quantum_cache_db.dart';
 
 class QuantumCacheDB {
   final MemoryManager _memory;
@@ -13,7 +10,7 @@ class QuantumCacheDB {
   final Mutex _writeMutex = Mutex();
 
   QuantumCacheDB(String path, {int isolateCount = 2})
-      : _memory = MemoryManager(FileManager(path)),
+      : _memory = MemoryManager(FileManager(path), IsolatePool()),
         _files = FileManager(path),
         _isolates = IsolatePool() {
     _isolates.initialize(isolateCount);
@@ -29,7 +26,17 @@ class QuantumCacheDB {
     await _writeMutex.protect(() async {
       final encoded = await _isolates.encode(value);
       final position = await _files.append(encoded);
-      await _memory.updateIndex(key, RecordPointer(position, encoded.length));
+      final pointer = RecordPointer(position, encoded.length);
+
+      // Auto-detect indexes
+      if (value is Map<String, dynamic>) {
+        for (final field in value.keys) {
+          if (!_memory.hasIndex(field)) {
+            _memory.createSecondaryIndex(field);
+          }
+          _memory.updateIndex(field, value[field], pointer);
+        }
+      }
     });
   }
 
@@ -42,5 +49,27 @@ class QuantumCacheDB {
     await _writeMutex.protect(() async {
       // Implement compaction algorithm
     });
+  }
+
+  Stream<dynamic> query(Query query) async* {
+    await for (final data in _memory.executeQuery(query)) {
+      yield _isolates.decode(data);
+    }
+  }
+
+  void createIndex(String field) {
+    _memory.createSecondaryIndex(field);
+  }
+
+  Future<void> delete(String key) async {
+    await _writeMutex.protect(() async {
+      await _memory.deleteIndex(key);
+      await _files.deleteRecord(key);
+    });
+  }
+
+  Future<void> close() async {
+    await _files.close();
+    await _isolates.dispose();
   }
 }

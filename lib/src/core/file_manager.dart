@@ -56,4 +56,14 @@ class FileManager {
     await _file!.setPosition(start);
     return await _file!.read(length);
   }
+
+  Future<Uint8List> read(int position, int length) async {
+    await _file!.setPosition(position);
+    return await _file!.read(length);
+  }
+
+  Future<void> deleteRecord(String key) async {
+    // Implementation to mark record as deleted
+    // (This would depend on your storage format)
+  }
 }

@@ -29,6 +29,7 @@ void main() async {
   results.add(await benchmarkSqlite());
   results.add(await benchmarkUltraFastDB());
   results.add(await benchmarkUltraFastDBComplex());
+  results.add(await benchmarkQuantumQuery());
 
   // Print results
   _printResultsTable(results);
@@ -159,6 +160,41 @@ Future<BenchmarkResult> benchmarkSqlite() async {
   } catch (e) {
     print('SQLite error: $e');
     return BenchmarkResult('SQLite', -1, -1, -1);
+  }
+}
+
+// New query benchmark function
+Future<BenchmarkResult> benchmarkQuantumQuery() async {
+  final stopwatch = Stopwatch();
+  final dbPath =
+      path.join(Directory.systemTemp.path, 'benchmark_quantum_query.db');
+  try {
+    final db = QuantumCacheDB(dbPath);
+    await db.init();
+
+    // Write test data
+    stopwatch.start();
+    for (int i = 0; i < numberOfOperations; i++) {
+      await db.put('qry_$i', {
+        'id': i,
+        'data': 'Query test data $i',
+      });
+    }
+    final writeTime = stopwatch.elapsedMilliseconds;
+    stopwatch.reset();
+
+    // Query test
+    stopwatch.start();
+    for (int i = 0; i < numberOfOperations; i++) {
+      await db.get('qry_$i');
+    }
+    final readTime = stopwatch.elapsedMilliseconds;
+
+    final fileSize = await File(dbPath).length();
+    return BenchmarkResult('Quantum Query', writeTime, readTime, fileSize);
+  } catch (e) {
+    print('Quantum Query error: $e');
+    return BenchmarkResult('Quantum Query', -1, -1, -1);
   }
 }
 

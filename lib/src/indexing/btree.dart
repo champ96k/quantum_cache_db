@@ -1,59 +1,35 @@
 // # B-tree implementation
+import 'package:quantum_cache_db/src/core/record_pointer.dart';
+import 'package:quantum_cache_db/src/query/any_comparable.dart';
 
-class BTreeIndex {
-  final int order;
-  _BTreeNode? _root;
+class BTreeIndex<T extends Comparable> {
+  final Map<AnyComparable, List<RecordPointer>> _index = {};
 
-  BTreeIndex([this.order = 32]);
+  void insert(dynamic value, RecordPointer pointer) {
+    final key = AnyComparable.from(value);
+    _index.putIfAbsent(key, () => []).add(pointer);
+  }
 
-  void insert(dynamic key, int position) {
-    _root ??= _BTreeNode(order, true);
+  Stream<RecordPointer> rangeScan(dynamic minVal, dynamic maxVal) async* {
+    final min = AnyComparable.from(minVal);
+    final max = AnyComparable.from(maxVal);
 
-    if (_root!.keys.length == 2 * order - 1) {
-      final newRoot = _BTreeNode(order, false);
-      newRoot.children.add(_root);
-      _splitChild(newRoot, 0);
-      _root = newRoot;
+    final keys = _index.keys
+        .where((k) => k.compareTo(min) >= 0 && k.compareTo(max) <= 0)
+        .toList()
+      ..sort();
+
+    for (final key in keys) {
+      yield* Stream.fromIterable(_index[key]!);
     }
-
-    _insertNonFull(_root!, key, position);
   }
 
-  int? find(dynamic key) {
-    return _root?._find(key);
-  }
-
-  void _insertNonFull(_BTreeNode node, dynamic key, int position) {
-    // Implementation of B-tree insert
-  }
-
-  void _splitChild(_BTreeNode parent, int index) {
-    // Implementation of B-tree split
-  }
-}
-
-class _BTreeNode {
-  final int order;
-  final bool isLeaf;
-  final List<dynamic> keys;
-  final List<int> values;
-  final List<_BTreeNode?> children;
-
-  _BTreeNode(this.order, this.isLeaf)
-      : keys = [],
-        values = [],
-        children = isLeaf ? [] : List.filled(order * 2, null);
-
-  int? _find(dynamic key) {
-    var i = 0;
-    while (i < keys.length && key.compareTo(keys[i]) > 0) {
-      i++;
+  void remove(T fieldValue, RecordPointer pointer) {
+    if (_index.containsKey(fieldValue)) {
+      _index[fieldValue]!.removeWhere((p) => p.position == pointer.position);
+      if (_index[fieldValue]!.isEmpty) {
+        _index.remove(fieldValue);
+      }
     }
-
-    if (i < keys.length && key == keys[i]) {
-      return values[i];
-    }
-
-    return isLeaf ? null : children[i]?._find(key);
   }
 }

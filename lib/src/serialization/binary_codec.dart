@@ -13,6 +13,7 @@ class BinaryCodec {
   static const int _typeInt = 4;
   static const int _typeDouble = 5;
   static const int _typeBool = 6;
+  static const int _typeDateTime = 7;
 
   Uint8List encode(dynamic value) {
     final builder = BytesBuilder();
@@ -42,6 +43,9 @@ class BinaryCodec {
       _encodeDouble(builder, value);
     } else if (value is bool) {
       _encodeBool(builder, value);
+    }
+    if (value is DateTime) {
+      _encodeInt(builder, value.millisecondsSinceEpoch);
     } else {
       throw ArgumentError('Unsupported type: ${value.runtimeType}');
     }
@@ -65,6 +69,9 @@ class BinaryCodec {
         return _decodeDouble(reader);
       case _typeBool:
         return _decodeBool(reader);
+      case _typeDateTime:
+        return DateTime.fromMillisecondsSinceEpoch(_decodeInt(reader));
+
       default:
         throw FormatException('Unknown type ID: $type');
     }

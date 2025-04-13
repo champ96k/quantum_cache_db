@@ -1,162 +1,97 @@
-// bin/benchmark.dart
-import 'dart:io';
-import 'package:hive/hive.dart';
 import 'package:quantum_cache_db/quantum_cache_db.dart';
-import 'package:sqlite3/sqlite3.dart';
-import 'package:path/path.dart' as path;
-
-const int numberOfOperations = 2000;
-const bool showDebugOutput = false;
 
 void main() async {
-  print('=== Database Benchmark ($numberOfOperations ops) ===\n');
+  final db = QuantumCacheDB('example.db');
+  await db.init();
 
-  // Clean up previous test files
-  await _cleanupTestFiles();
-
-  // Run benchmarks
-  await _runBenchmark('Hive', benchmarkHive);
-  await _runBenchmark('SQLite', benchmarkSqlite);
-  await _runBenchmark('QuantumCacheDB', benchmarkUltraFastDB);
-  await _runBenchmark('QuantumCacheDB (complex)', benchmarkUltraFastDBComplex);
-
-  print('\n=== Benchmark Complete ===');
-}
-
-Future<void> _cleanupTestFiles() async {
-  final files = [
-    path.join(Directory.systemTemp.path, 'benchmark_hive'),
-    path.join(Directory.systemTemp.path, 'benchmark_sqlite.db'),
-    path.join(Directory.systemTemp.path, 'benchmark_isar'),
-    path.join(Directory.systemTemp.path, 'benchmark_ultrafast.db'),
-  ];
-
-  for (final file in files) {
-    try {
-      if (await File(file).exists()) await File(file).delete();
-      if (await Directory(file).exists()) {
-        await Directory(file).delete(recursive: true);
-      }
-    } catch (e) {
-      if (showDebugOutput) print('Cleanup error for $file: $e');
-    }
-  }
-}
-
-Future<void> _runBenchmark(
-    String name, Future<void> Function() benchmarkFn) async {
-  print('Running $name...');
-  final stopwatch = Stopwatch()..start();
   try {
-    await benchmarkFn();
-  } catch (e) {
-    print('Error in $name: $e');
-    rethrow;
-  } finally {
-    stopwatch.stop();
-    print('$name completed in: ${stopwatch.elapsedMilliseconds}ms\n');
-  }
-}
+    print('Creating indexes...');
+    db.createIndex('name');
+    db.createIndex('age');
+    db.createIndex('isActive');
+    db.createIndex('createdAt');
 
-Future<void> benchmarkHive() async {
-  Hive.init(Directory.systemTemp.path);
-  final box = await Hive.openBox('benchmark_hive');
+    print('\n── Inserting Records ──');
+    final now = DateTime.now();
 
-  // Write test
-  for (int i = 0; i < numberOfOperations; i++) {
-    await box.put('key_$i', 'value_$i');
-    if (showDebugOutput && i % 500 == 0) print('Hive write $i');
-  }
-
-  // Read test
-  for (int i = 0; i < numberOfOperations; i++) {
-    final value = box.get('key_$i');
-    if (showDebugOutput && i % 500 == 0) print('Hive read $i: $value');
-  }
-
-  await box.close();
-}
-
-Future<void> benchmarkSqlite() async {
-  final db =
-      sqlite3.open(path.join(Directory.systemTemp.path, 'benchmark_sqlite.db'));
-
-  db.execute('''
-    CREATE TABLE IF NOT EXISTS benchmark (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      key TEXT UNIQUE,
-      value TEXT
-    )
-  ''');
-
-  // Write test
-  final stmt =
-      db.prepare('INSERT OR REPLACE INTO benchmark (key, value) VALUES (?, ?)');
-  for (int i = 0; i < numberOfOperations; i++) {
-    stmt.execute(['key_$i', 'value_$i']);
-    if (showDebugOutput && i % 500 == 0) print('SQLite write $i');
-  }
-  stmt.dispose();
-
-  // Read test
-  final readStmt = db.prepare('SELECT value FROM benchmark WHERE key = ?');
-  for (int i = 0; i < numberOfOperations; i++) {
-    final result = readStmt.select(['key_$i']);
-    if (showDebugOutput && i % 500 == 0) {
-      print('SQLite read $i: ${result.first}');
-    }
-  }
-  readStmt.dispose();
-
-  db.dispose();
-}
-
-Future<void> benchmarkUltraFastDB() async {
-  final db = QuantumCacheDB(
-      path.join(Directory.systemTemp.path, 'benchmark_ultrafast.db'));
-  await db.init();
-
-  // Write test
-  for (int i = 0; i < numberOfOperations; i++) {
-    await db.put('key_$i', 'value_$i');
-    if (showDebugOutput && i % 500 == 0) print('QuantumCacheDB write $i');
-  }
-
-  // Read test
-  for (int i = 0; i < numberOfOperations; i++) {
-    final value = await db.get('key_$i');
-    if (showDebugOutput && i % 500 == 0) {
-      print('QuantumCacheDB read $i: $value');
-    }
-  }
-}
-
-Future<void> benchmarkUltraFastDBComplex() async {
-  final db = QuantumCacheDB(
-      path.join(Directory.systemTemp.path, 'benchmark_ultrafast_complex.db'));
-  await db.init();
-
-  // Write test with complex data
-  for (int i = 0; i < numberOfOperations; i++) {
-    await db.put('user_$i', {
-      'id': i,
-      'name': 'User $i',
-      'preferences': {
-        'darkMode': i % 2 == 0,
-        'notifications': true,
-      },
-      'tags': ['user', 'test', 'item$i'],
+    await db.put('user1', {
+      'name': 'Alice',
+      'age': 28,
+      'isActive': true,
+      'createdAt': now,
+      'tags': ['admin', 'verified']
     });
-    if (showDebugOutput && i % 500 == 0) {
-      print('QuantumCacheDB complex write $i');
-    }
-  }
 
-  // Read test
-  for (int i = 0; i < numberOfOperations; i++) {
-    final value = await db.get('user_$i');
-    if (showDebugOutput && i % 500 == 0) {
-      print('QuantumCacheDB complex read $i: ${value?['name']}');
-    }
+    await db.put('user2', {
+      'name': 'Bob',
+      'age': 35,
+      'isActive': false,
+      'createdAt': now.subtract(Duration(days: 10)),
+      'tags': ['user']
+    });
+
+    await db.put('user3', {
+      'name': 'Charlie',
+      'age': 42,
+      'isActive': true,
+      'createdAt': now.subtract(Duration(days: 5)),
+      'tags': ['manager', 'verified']
+    });
+
+    final user3 = await db.get('user3');
+    print("User 3 details: $user3");
+
+    print('\n── Fetching Single Record ──');
+    final user1 = await db.get('user1');
+    print('User1: ${user1?['name']} (Age: ${user1?['age']})');
+
+    // Exact query
+    print('\nExact Query:');
+    final exactResult = await db.query(ExactQuery('user2')).first;
+    print('Found user: ${exactResult['name']}');
+
+    // Age range query
+    print('\nAge Range Query (30-40):');
+    final adults = db.query(RangeQuery('age', 30, 40));
+    await adults
+        .forEach((user) => print('${user['name']} (${user['age']} years old)'));
+
+    // Boolean query
+    print('\nActive Users Query:');
+    final activeUsers = db.query(RangeQuery('isActive', true, true));
+    print(
+        'Active users: ${await activeUsers.map((u) => u['name']).join(', ')}');
+
+    // Date range query
+    print('\nRecent Users (last 7 days):');
+    final recentUsers =
+        db.query(RangeQuery('createdAt', now.subtract(Duration(days: 7)), now));
+    await recentUsers.forEach(
+        (user) => print('${user['name']} joined on ${user['createdAt']}'));
+
+    // String range query
+    print('\nNames A-M:');
+    final aToM = db.query(RangeQuery('name', 'A', 'M'));
+    print(await aToM.map((u) => u['name']).join(', '));
+
+    // ──────────────── UPDATE OPERATION ────────────────
+    print('\n── Updating Record ──');
+    await db.put('user1', {
+      ...user1!,
+      'age': 29,
+      'tags': ['admin', 'verified', 'premium']
+    });
+    print('Updated user1 age to 29');
+
+    // ──────────────── DELETE OPERATION ────────────────
+    print('\n── Deleting Record ──');
+    await db.delete('user3');
+    final deletedUser = await db.get('user3');
+    print('User3 exists after deletion: ${deletedUser != null}');
+  } catch (e) {
+    print('Operation failed: $e');
+  } finally {
+    await db.close();
+    print('\nDatabase closed');
   }
 }
