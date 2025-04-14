@@ -9,9 +9,8 @@ class ReaderState {
   void checkRemaining(int bytesNeeded) {
     if (bytesNeeded < 0) throw ArgumentError('Negative bytes requested');
     if (offset + bytesNeeded > data.lengthInBytes) {
-      throw RangeError('Buffer underflow: '
-          'Offset=$offset, Requested=$bytesNeeded, '
-          'Available=${data.lengthInBytes - offset}');
+      throw RangeError('Buffer underflow: Need $bytesNeeded bytes, '
+          'only ${data.lengthInBytes - offset} available');
     }
   }
 }

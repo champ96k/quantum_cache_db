@@ -1,6 +1,7 @@
 // lib/src/serialization/binary_codec.dart
-import 'dart:typed_data';
+
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:quantum_cache_db/src/serialization/reader_state.dart';
 
@@ -31,16 +32,22 @@ class BinaryCodec {
     if (value == null) {
       builder.addByte(_typeNull);
     } else if (value is Map) {
+      builder.addByte(_typeMap);
       _encodeMap(builder, value.cast<String, dynamic>());
     } else if (value is List) {
+      builder.addByte(_typeList);
       _encodeList(builder, value);
     } else if (value is String) {
+      builder.addByte(_typeString);
       _encodeString(builder, value);
     } else if (value is int) {
+      builder.addByte(_typeInt);
       _encodeInt(builder, value);
     } else if (value is double) {
+      builder.addByte(_typeDouble);
       _encodeDouble(builder, value);
     } else if (value is bool) {
+      builder.addByte(_typeBool);
       _encodeBool(builder, value);
     } else {
       throw ArgumentError('Unsupported type: ${value.runtimeType}');
@@ -72,9 +79,7 @@ class BinaryCodec {
   }
 
   void _encodeMap(BytesBuilder builder, Map<String, dynamic> map) {
-    builder.addByte(_typeMap);
     _encodeInt(builder, map.length);
-
     map.forEach((key, value) {
       _encodeString(builder, key);
       _encodeValue(builder, value);
@@ -86,8 +91,7 @@ class BinaryCodec {
     final map = <String, dynamic>{};
 
     for (var i = 0; i < length; i++) {
-      // KEY FIX: Use _decodeValue for keys to handle type byte
-      final key = _decodeValue(reader) as String;
+      final key = _decodeString(reader);
       final value = _decodeValue(reader);
       map[key] = value;
     }
@@ -95,9 +99,7 @@ class BinaryCodec {
   }
 
   void _encodeList(BytesBuilder builder, List<dynamic> list) {
-    builder.addByte(_typeList);
     _encodeInt(builder, list.length);
-
     for (final value in list) {
       _encodeValue(builder, value);
     }
@@ -113,6 +115,12 @@ class BinaryCodec {
     return list;
   }
 
+  void _encodeString(BytesBuilder builder, String value) {
+    final bytes = utf8.encode(value);
+    _encodeInt(builder, bytes.length);
+    builder.add(bytes);
+  }
+
   String _decodeString(ReaderState reader) {
     final length = _decodeInt(reader);
     reader.checkRemaining(length);
@@ -121,13 +129,6 @@ class BinaryCodec {
         reader.data.buffer, reader.data.offsetInBytes + reader.offset, length);
     reader.offset += length;
     return utf8.decode(bytes);
-  }
-
-  void _encodeString(BytesBuilder builder, String value) {
-    builder.addByte(_typeString);
-    final bytes = utf8.encode(value);
-    _encodeInt(builder, bytes.length);
-    builder.add(bytes);
   }
 
   void _encodeInt(BytesBuilder builder, int value) {
@@ -157,7 +158,6 @@ class BinaryCodec {
   }
 
   void _encodeDouble(BytesBuilder builder, double value) {
-    builder.addByte(_typeDouble);
     final bytes = ByteData(8)..setFloat64(0, value, Endian.big);
     builder.add(bytes.buffer.asUint8List());
   }
@@ -170,7 +170,6 @@ class BinaryCodec {
   }
 
   void _encodeBool(BytesBuilder builder, bool value) {
-    builder.addByte(_typeBool);
     builder.addByte(value ? 1 : 0);
   }
 

@@ -11,7 +11,7 @@ void main() async {
 
   for (int i = 0; i < 10; i++) {
     await db.put('user_$i', {
-      // 'id': i,
+      'id': i,
       'name': 'User $i',
       'preferences': {
         'darkMode': i % 2 == 0,
