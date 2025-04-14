@@ -17,9 +17,22 @@ class MemoryManager {
   MemoryManager(this._fileManager);
   final LRUCache<int, Uint8List> _pageCache = LRUCache(maxSize: 100);
 
+  int get pageSize => _pageSize;
+
   Future<void> load(Uint8List data) async {
     await _cacheMutex.protect(() async {
-      _pageCache.put(0, data);
+      int offset = 0;
+      int pageNumber = 0;
+      while (offset < data.length) {
+        int end = offset + _pageSize;
+        if (end > data.length) {
+          end = data.length;
+        }
+        Uint8List pageData = data.sublist(offset, end);
+        _pageCache.put(pageNumber, pageData);
+        offset = end;
+        pageNumber++;
+      }
     });
   }
 
@@ -28,14 +41,15 @@ class MemoryManager {
     if (pointer == null) return null;
 
     return await _cacheMutex.protect(() async {
-      final pageNumber = pointer.position ~/ _pageSize;
+      final pageNumber = pointer.position ~/ pageSize;
       var page = _pageCache.get(pageNumber);
+
       if (page == null) {
         page = await _fileManager.readPage(pageNumber);
         _pageCache.put(pageNumber, page);
       }
 
-      final offset = pointer.position % _pageSize;
+      final offset = pointer.position % pageSize;
       if (offset + pointer.length > page.length) return null;
 
       final data = page.sublist(offset, offset + pointer.length);
@@ -50,6 +64,14 @@ class MemoryManager {
   Future<int> get cacheSize async {
     return await _cacheMutex.protect(() async {
       return _pageCache.values.fold<int>(0, (sum, page) => sum + page.length);
+    });
+  }
+
+  Future<void> invalidatePages(int startPage, int endPage) async {
+    await _cacheMutex.protect(() async {
+      for (int page = startPage; page <= endPage; page++) {
+        _pageCache.remove(page);
+      }
     });
   }
 }

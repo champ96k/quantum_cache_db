@@ -25,5 +25,9 @@ class LRUCache<K, V> {
     _cache[key] = value;
   }
 
+  void remove(K key) {
+    _cache.remove(key);
+  }
+
   List<V> get values => _cache.values.toList();
 }

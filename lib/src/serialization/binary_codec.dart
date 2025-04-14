@@ -48,6 +48,7 @@ class BinaryCodec {
   }
 
   dynamic _decodeValue(ReaderState reader) {
+    reader.checkRemaining(1);
     final type = reader.data.getUint8(reader.offset++);
 
     switch (type) {
@@ -83,8 +84,10 @@ class BinaryCodec {
   Map<String, dynamic> _decodeMap(ReaderState reader) {
     final length = _decodeInt(reader);
     final map = <String, dynamic>{};
+
     for (var i = 0; i < length; i++) {
-      final key = _decodeString(reader);
+      // KEY FIX: Use _decodeValue for keys to handle type byte
+      final key = _decodeValue(reader) as String;
       final value = _decodeValue(reader);
       map[key] = value;
     }
@@ -112,6 +115,8 @@ class BinaryCodec {
 
   String _decodeString(ReaderState reader) {
     final length = _decodeInt(reader);
+    reader.checkRemaining(length);
+
     final bytes = Uint8List.view(
         reader.data.buffer, reader.data.offsetInBytes + reader.offset, length);
     reader.offset += length;
@@ -126,15 +131,27 @@ class BinaryCodec {
   }
 
   void _encodeInt(BytesBuilder builder, int value) {
-    builder.addByte(_typeInt);
-    builder.addByte(value >> 24);
-    builder.addByte(value >> 16);
-    builder.addByte(value >> 8);
-    builder.addByte(value);
+    if (value < 0) throw ArgumentError('Negative values not supported');
+
+    if (value <= 0xFF) {
+      builder.addByte(value);
+    } else {
+      builder.addByte(0xFF);
+      builder.addByte((value >> 24) & 0xFF);
+      builder.addByte((value >> 16) & 0xFF);
+      builder.addByte((value >> 8) & 0xFF);
+      builder.addByte(value & 0xFF);
+    }
   }
 
   int _decodeInt(ReaderState reader) {
-    final value = reader.data.getInt32(reader.offset, Endian.big);
+    reader.checkRemaining(1);
+    final firstByte = reader.data.getUint8(reader.offset++);
+
+    if (firstByte != 0xFF) return firstByte;
+
+    reader.checkRemaining(4);
+    final value = reader.data.getUint32(reader.offset, Endian.big);
     reader.offset += 4;
     return value;
   }
@@ -146,6 +163,7 @@ class BinaryCodec {
   }
 
   double _decodeDouble(ReaderState reader) {
+    reader.checkRemaining(8);
     final value = reader.data.getFloat64(reader.offset, Endian.big);
     reader.offset += 8;
     return value;
@@ -157,6 +175,7 @@ class BinaryCodec {
   }
 
   bool _decodeBool(ReaderState reader) {
+    reader.checkRemaining(1);
     return reader.data.getUint8(reader.offset++) == 1;
   }
 }
